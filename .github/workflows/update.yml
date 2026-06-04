@@ -39,7 +39,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DASHBOARD_USER: ${{ github.repository_owner }}
-        run: node scripts/fetch-prs.js
+        run: mkdir -p data && node scripts/fetch-prs.js
 
       - uses: actions/configure-pages@v5
         id: pages
