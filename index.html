@@ -97,6 +97,8 @@ body { background: var(--color-canvas-default); font-family: -apple-system, Blin
 .badge-mention-pr { background: var(--color-accent-subtle); color: var(--color-accent-fg); }
 .badge-mention-issue { background: var(--color-done-subtle); color: var(--color-done-fg); }
 .badge-issue { background: var(--color-attention-subtle); color: var(--color-attention-fg); }
+.move-btn { background: none; border: 1px solid var(--color-border-default); border-radius: 6px; padding: 2px 8px; font-size: 11px; color: var(--color-fg-muted); cursor: pointer; margin-left: auto; flex-shrink: 0; }
+.move-btn:hover { border-color: var(--color-accent-emphasis); color: var(--color-accent-fg); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; margin-top: 8px; }
 .section-title { font-size: 14px; font-weight: 600; }
 .section-count { font-size: 12px; color: var(--color-fg-muted); }
@@ -393,7 +395,18 @@ function escapeAttr(str) {
   return str.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
-function renderPR(pr, type) {
+const OVERRIDES_KEY = "dashboard-overrides";
+function getOverrides() {
+  try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY)) || {}; } catch { return {}; }
+}
+function setOverride(url, target) {
+  const o = getOverrides();
+  if (target) o[url] = target;
+  else delete o[url];
+  localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o));
+}
+
+function renderPR(pr, type, moveBtn) {
   let badge = "";
   if (type === "closed") {
     badge = pr.merged
@@ -406,6 +419,7 @@ function renderPR(pr, type) {
   const staleBadge = age > 7 ? `<span class="pr-badge badge-stale">${age}d waiting</span>` : "";
   const dateLabel = type === "closed" ? `closed ${timeAgo(pr.closed)}` : `updated ${timeAgo(pr.updated)}`;
   const authorLine = type === "review" ? `<span>@${escapeHtml(pr.author)}</span>` : "";
+  const moveBtnHtml = moveBtn || "";
 
   return `<div class="pr-item">
     <img class="pr-avatar" src="${escapeAttr(pr.avatar)}" alt="" loading="lazy">
@@ -414,6 +428,7 @@ function renderPR(pr, type) {
         <a href="${escapeAttr(pr.url)}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(pr.title)}</a>
         <span class="pr-number">#${pr.number}</span>
         ${badge}${staleBadge}
+        ${moveBtnHtml}
       </div>
       <div class="pr-meta">
         <span class="pr-repo">${escapeHtml(pr.repo)}</span>
@@ -529,34 +544,66 @@ Promise.all([
     const userLabel = data.github_user ? `@${data.github_user} • ` : "";
     const updatedLabel = data.updated ? `Updated ${data.updated}` : "Run the workflow to populate data";
     document.getElementById("subtitle").textContent = `${userLabel}${updatedLabel}`;
-    document.getElementById("count-review").textContent = data.counts.to_review;
-    document.getElementById("count-reviewed-open").textContent = data.counts.reviewed_open || 0;
+    // Clean stale overrides — if a PR is no longer in to_review, the override is outdated
+    const staleOverrides = getOverrides();
+    const reviewUrls = new Set(data.to_review.map(pr => pr.url));
+    Object.keys(staleOverrides).forEach(url => {
+      if (!reviewUrls.has(url)) setOverride(url, null);
+    });
+
+    function updateMoveCounts() {
+      const overrides = getOverrides();
+      const movedCount = data.to_review.filter(pr => overrides[pr.url] === "reviewed-open").length;
+      document.getElementById("count-review").textContent = data.counts.to_review - movedCount;
+      document.getElementById("count-reviewed-open").textContent = (data.counts.reviewed_open || 0) + movedCount;
+    }
+    updateMoveCounts();
     document.getElementById("count-open").textContent = data.counts.open;
     document.getElementById("count-mentions").textContent = data.counts.mentions || 0;
     document.getElementById("count-issues").textContent = data.counts.issues || 0;
     document.getElementById("count-reviewed").textContent = data.counts.reviewed_by || 0;
     document.getElementById("count-closed").textContent = data.counts.closed;
 
+    function refreshAll() { updateMoveCounts(); renderReview(); renderReviewedOpen(); }
+
     const renderReview = () => {
+      const overrides = getOverrides();
       const repos = getSelectedRepos("repo-checkboxes-review");
       const sort = document.getElementById("filter-review-sort").value;
-      let filtered = data.to_review.filter(pr => repos.has(pr.repo));
+      let filtered = data.to_review.filter(pr => repos.has(pr.repo) && overrides[pr.url] !== "reviewed-open");
       filtered = sortPRs(filtered, sort);
       document.getElementById("list-review").innerHTML = filtered.length
-        ? filtered.map(pr => renderPR(pr, "review")).join("")
+        ? filtered.map(pr => renderPR(pr, "review",
+            `<button class="move-btn" data-url="${escapeAttr(pr.url)}" data-action="mark-reviewed">✓ Reviewed</button>`
+          )).join("")
         : `<div class="loading">No PRs match the filter</div>`;
       document.getElementById("section-count-review").textContent = `${filtered.length} open`;
+      document.getElementById("list-review").querySelectorAll("[data-action=mark-reviewed]").forEach(btn => {
+        btn.addEventListener("click", (e) => { e.stopPropagation(); setOverride(btn.dataset.url, "reviewed-open"); refreshAll(); });
+      });
     };
 
     const renderReviewedOpen = () => {
+      const overrides = getOverrides();
       const repos = getSelectedRepos("repo-checkboxes-reviewed-open");
       const sort = document.getElementById("filter-reviewed-open-sort").value;
+      const movedFromReview = data.to_review.filter(pr => overrides[pr.url] === "reviewed-open" && repos.has(pr.repo));
       let filtered = (data.reviewed_open || []).filter(pr => repos.has(pr.repo));
+      filtered = [...movedFromReview, ...filtered.filter(pr => !movedFromReview.some(m => m.url === pr.url))];
       filtered = sortPRs(filtered, sort);
       document.getElementById("list-reviewed-open").innerHTML = filtered.length
-        ? filtered.map(pr => renderPR(pr, "open")).join("")
+        ? filtered.map(pr => {
+            const isManual = overrides[pr.url] === "reviewed-open";
+            const btn = isManual
+              ? `<button class="move-btn" data-url="${escapeAttr(pr.url)}" data-action="undo-reviewed">↩ Undo</button>`
+              : "";
+            return renderPR(pr, "open", btn);
+          }).join("")
         : `<div class="loading">No PRs match the filter</div>`;
       document.getElementById("section-count-reviewed-open").textContent = `${filtered.length} open`;
+      document.getElementById("list-reviewed-open").querySelectorAll("[data-action=undo-reviewed]").forEach(btn => {
+        btn.addEventListener("click", (e) => { e.stopPropagation(); setOverride(btn.dataset.url, null); refreshAll(); });
+      });
     };
 
     const renderOpen = () => {
