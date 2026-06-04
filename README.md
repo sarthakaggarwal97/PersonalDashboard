@@ -2,7 +2,7 @@
 
 A GitHub Pages dashboard for tracking your pull requests and issues across one or more GitHub organizations.
 
-**PR Dashboard**: [roshkhatri.github.io/PersonalDashboard](https://roshkhatri.github.io/PersonalDashboard/)
+**PR Dashboard**: [sarthakaggarwal97.github.io/PersonalDashboard](https://sarthakaggarwal97.github.io/PersonalDashboard/)
 
 ## Features
 
