@@ -108,7 +108,12 @@ async function fetchForOrg(org) {
     `author:${GITHUB_USER} is:pr is:closed org:${org}`
   );
 
-  console.log(`[${org}] Fetching PRs you reviewed...`);
+  console.log(`[${org}] Fetching PRs you reviewed (open)...`);
+  const reviewedOpenItems = await searchAll(
+    `reviewed-by:${GITHUB_USER} is:pr is:open org:${org} -author:${GITHUB_USER}`
+  );
+
+  console.log(`[${org}] Fetching PRs you reviewed (closed)...`);
   const reviewedByItems = await searchAll(
     `reviewed-by:${GITHUB_USER} is:pr is:closed org:${org} -author:${GITHUB_USER}`
   );
@@ -128,7 +133,7 @@ async function fetchForOrg(org) {
     `author:${GITHUB_USER} is:issue is:open org:${org}`
   );
 
-  return { reviewItems, openItems, closedItems, reviewedByItems, mentionItems, assignedIssueItems, authoredIssueItems };
+  return { reviewItems, openItems, closedItems, reviewedOpenItems, reviewedByItems, mentionItems, assignedIssueItems, authoredIssueItems };
 }
 
 async function main() {
@@ -144,6 +149,7 @@ async function main() {
   let allReviewItems = [];
   let allOpenItems = [];
   let allClosedItems = [];
+  let allReviewedOpenItems = [];
   let allReviewedByItems = [];
   let allMentionItems = [];
   let allAssignedIssueItems = [];
@@ -153,6 +159,7 @@ async function main() {
     allReviewItems.push(...result.reviewItems);
     allOpenItems.push(...result.openItems);
     allClosedItems.push(...result.closedItems);
+    allReviewedOpenItems.push(...result.reviewedOpenItems);
     allReviewedByItems.push(...result.reviewedByItems);
     allMentionItems.push(...result.mentionItems);
     allAssignedIssueItems.push(...result.assignedIssueItems);
@@ -162,6 +169,7 @@ async function main() {
   const toReview = allReviewItems.map(mapPR);
   const openPrs = allOpenItems.map(mapPR);
   const closedPrs = allClosedItems.map(mapPR);
+  const reviewedOpen = allReviewedOpenItems.map(mapPR);
   const reviewedBy = allReviewedByItems.map(mapPR);
   const mentions = allMentionItems.map(mapMention);
 
@@ -189,6 +197,7 @@ async function main() {
     to_review: toReview,
     open_prs: openPrs,
     closed_prs: closedPrs,
+    reviewed_open: reviewedOpen,
     reviewed_by: reviewedBy,
     mentions,
     issues,
@@ -196,13 +205,16 @@ async function main() {
       to_review: toReview.length,
       open: openPrs.length,
       closed: closedPrs.length,
+      reviewed_open: reviewedOpen.length,
       reviewed_by: reviewedBy.length,
       mentions: mentions.length,
       issues: issues.length,
     },
   };
 
-  const outPath = path.join(__dirname, "..", "data", "prs.json");
+  const outDir = path.join(__dirname, "..", "data");
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  const outPath = path.join(outDir, "prs.json");
   fs.writeFileSync(outPath, JSON.stringify(data, null, 2));
   console.log(
     `\nDone. ${data.counts.to_review} to review, ${data.counts.open} open, ${data.counts.closed} closed, ${data.counts.reviewed_by} reviewed, ${data.counts.mentions} mentions, ${data.counts.issues} issues. Written to data/prs.json`
