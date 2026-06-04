@@ -31,8 +31,8 @@ Other features:
 ### Setup (one-time, takes 30 seconds)
 
 1. Fork this repository
-2. Go to your fork's **Settings > Pages**
-3. Under "Source", select **GitHub Actions** (not "Deploy from a branch")
+2. Go to the **Actions** tab in your fork and click **"I understand my workflows, go ahead and enable them"**
+3. Go to **Settings > Pages** and set Source to **GitHub Actions**
 4. Edit `config.json` — set your organization(s):
    ```json
    {
