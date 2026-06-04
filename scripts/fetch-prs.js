@@ -27,7 +27,11 @@ function request(url) {
             reject(new Error(`HTTP ${res.statusCode}: ${body.slice(0, 200)}`));
             return;
           }
-          resolve({ body: JSON.parse(body), headers: res.headers });
+          try {
+            resolve({ body: JSON.parse(body), headers: res.headers });
+          } catch (e) {
+            reject(new Error(`Invalid JSON from ${url.slice(0, 80)}: ${e.message}`));
+          }
         });
       })
       .on("error", reject);
@@ -38,12 +42,13 @@ async function searchAll(query) {
   const items = [];
   let page = 1;
   const perPage = 100;
+  const maxPages = 10;
 
-  while (true) {
+  while (page <= maxPages) {
     const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&sort=updated&order=desc`;
     const { body } = await request(url);
     items.push(...body.items);
-    if (items.length >= body.total_count || body.items.length < perPage) break;
+    if (body.items.length < perPage) break;
     page++;
   }
   return items;
@@ -127,6 +132,8 @@ async function fetchForOrg(org) {
 async function main() {
   console.log(`Fetching data for ${ORGS.length} org(s): ${ORGS.join(", ")}`);
 
+  const results = await Promise.all(ORGS.map(fetchForOrg));
+
   let allReviewItems = [];
   let allOpenItems = [];
   let allClosedItems = [];
@@ -135,8 +142,7 @@ async function main() {
   let allAssignedIssueItems = [];
   let allAuthoredIssueItems = [];
 
-  for (const org of ORGS) {
-    const result = await fetchForOrg(org);
+  for (const result of results) {
     allReviewItems.push(...result.reviewItems);
     allOpenItems.push(...result.openItems);
     allClosedItems.push(...result.closedItems);
@@ -169,10 +175,6 @@ async function main() {
       return m;
     });
 
-  const repos = [
-    ...new Set([...toReview, ...openPrs, ...closedPrs, ...reviewedBy, ...mentions, ...issues].map((pr) => pr.repo)),
-  ].sort();
-
   const data = {
     github_user: GITHUB_USER,
     orgs: ORGS,
@@ -183,7 +185,6 @@ async function main() {
     reviewed_by: reviewedBy,
     mentions,
     issues,
-    repos,
     counts: {
       to_review: toReview.length,
       open: openPrs.length,

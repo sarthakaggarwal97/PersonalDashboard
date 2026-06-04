@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PR Dashboard - valkey-io</title>
+<title>PR Dashboard</title>
 <script>
 (function(){var s=localStorage.getItem("theme");var t=s==="light"||s==="dark"?s:window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";document.documentElement.setAttribute("data-theme",t)})();
 </script>
@@ -111,6 +111,9 @@ body { background: var(--color-canvas-default); font-family: -apple-system, Blin
 .theme-toggle { background: var(--color-canvas-subtle); border: 1px solid var(--color-border-default); border-radius: 6px; padding: 4px 10px; font-size: 13px; cursor: pointer; color: var(--color-fg-muted); display: inline-flex; align-items: center; gap: 6px; }
 .theme-toggle:hover { background: var(--color-neutral-subtle); }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.github-link { color: var(--color-fg-muted); display: inline-flex; align-items: center; padding: 4px; border-radius: 6px; }
+.github-link:hover { color: var(--color-fg-default); background: var(--color-neutral-subtle); }
 .repo-filter { margin: 0; }
 .repo-filter summary { font-size: 13px; font-weight: 500; color: var(--color-fg-default); cursor: pointer; padding: 5px 8px; background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 6px; display: inline-block; list-style: none; }
 .repo-filter summary::-webkit-details-marker { display: none; }
@@ -129,7 +132,12 @@ body { background: var(--color-canvas-default); font-family: -apple-system, Blin
 <div class="header">
   <div class="header-row">
     <h1 id="dashboard-title">PR Dashboard</h1>
-    <button class="theme-toggle" id="theme-toggle" title="Toggle theme"></button>
+    <div class="header-actions">
+      <a href="https://github.com/roshkhatri/PersonalDashboard" target="_blank" rel="noopener" class="github-link" title="View on GitHub">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle theme"></button>
+    </div>
   </div>
   <div class="subtitle" id="subtitle">Loading...</div>
 </div>
@@ -358,6 +366,10 @@ function daysOld(dateStr) {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
+function escapeAttr(str) {
+  return str.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
 function renderPR(pr, type) {
   let badge = "";
   if (type === "closed") {
@@ -367,17 +379,16 @@ function renderPR(pr, type) {
   } else if (pr.draft) {
     badge = `<span class="pr-badge badge-draft">✏ Draft</span>`;
   }
-  const staleBadge = (type === "review" && daysOld(pr.created) > 7)
-    ? `<span class="pr-badge badge-stale">${daysOld(pr.created)}d waiting</span>`
-    : "";
+  const age = (type === "review") ? daysOld(pr.created) : 0;
+  const staleBadge = age > 7 ? `<span class="pr-badge badge-stale">${age}d waiting</span>` : "";
   const dateLabel = type === "closed" ? `closed ${timeAgo(pr.closed)}` : `updated ${timeAgo(pr.updated)}`;
   const authorLine = type === "review" ? `<span>@${escapeHtml(pr.author)}</span>` : "";
 
   return `<div class="pr-item">
-    <img class="pr-avatar" src="${pr.avatar}" alt="" loading="lazy">
+    <img class="pr-avatar" src="${escapeAttr(pr.avatar)}" alt="" loading="lazy">
     <div class="pr-content">
       <div class="pr-title-row">
-        <a href="${pr.url}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(pr.title)}</a>
+        <a href="${escapeAttr(pr.url)}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(pr.title)}</a>
         <span class="pr-number">#${pr.number}</span>
         ${badge}${staleBadge}
       </div>
@@ -395,15 +406,14 @@ function renderMention(item) {
   const typeBadge = item.is_pr
     ? `<span class="pr-badge badge-mention-pr">PR</span>`
     : `<span class="pr-badge badge-mention-issue">Issue</span>`;
-  const staleBadge = daysOld(item.updated) > 7
-    ? `<span class="pr-badge badge-stale">${daysOld(item.updated)}d ago</span>`
-    : "";
+  const age = daysOld(item.updated);
+  const staleBadge = age > 7 ? `<span class="pr-badge badge-stale">${age}d ago</span>` : "";
 
   return `<div class="pr-item">
-    <img class="pr-avatar" src="${item.avatar}" alt="" loading="lazy">
+    <img class="pr-avatar" src="${escapeAttr(item.avatar)}" alt="" loading="lazy">
     <div class="pr-content">
       <div class="pr-title-row">
-        <a href="${item.url}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(item.title)}</a>
+        <a href="${escapeAttr(item.url)}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(item.title)}</a>
         <span class="pr-number">#${item.number}</span>
         ${typeBadge}${staleBadge}
       </div>
@@ -418,10 +428,10 @@ function renderMention(item) {
 
 function renderIssue(item) {
   return `<div class="pr-item">
-    <img class="pr-avatar" src="${item.avatar}" alt="" loading="lazy">
+    <img class="pr-avatar" src="${escapeAttr(item.avatar)}" alt="" loading="lazy">
     <div class="pr-content">
       <div class="pr-title-row">
-        <a href="${item.url}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(item.title)}</a>
+        <a href="${escapeAttr(item.url)}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(item.title)}</a>
         <span class="pr-number">#${item.number}</span>
         <span class="pr-badge badge-issue">Issue</span>
       </div>
@@ -602,7 +612,7 @@ Promise.all([fetch("config.json").then(r => r.json()), fetch("data/prs.json").th
     renderClosed();
   })
   .catch(err => {
-    document.getElementById("list-review").innerHTML = `<div class="loading">Failed to load data: ${err.message}</div>`;
+    document.getElementById("list-review").innerHTML = `<div class="loading">Failed to load data: ${escapeHtml(err.message)}</div>`;
   });
 </script>
 </body>

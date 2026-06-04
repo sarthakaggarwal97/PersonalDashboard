@@ -32,12 +32,16 @@ Displays:
 
 ## Data Source
 
-GitHub Search API (authenticated via `GITHUB_TOKEN` in Actions):
-- `review-requested:roshkhatri is:pr is:open org:valkey-io`
-- `author:roshkhatri is:pr is:open org:valkey-io`
-- `author:roshkhatri is:pr is:closed org:valkey-io`
+GitHub Search API (authenticated via `GITHUB_TOKEN` in Actions), per org:
+- `review-requested:<user> is:pr is:open org:<org>`
+- `author:<user> is:pr is:open org:<org>`
+- `author:<user> is:pr is:closed org:<org>`
+- `reviewed-by:<user> is:pr is:closed org:<org> -author:<user>`
+- `mentions:<user> is:open org:<org> -author:<user>`
+- `assignee:<user> is:issue is:open org:<org>`
+- `author:<user> is:issue is:open org:<org>`
 
-All pages are paginated to fetch the complete result set.
+All queries are paginated (up to 1000 results per query).
 
 ## Setup
 
@@ -51,10 +55,10 @@ All pages are paginated to fetch the complete result set.
 To create your own dashboard:
 
 1. Fork this repository
-2. Edit `config.json` — change `org` to your target organization:
+2. Edit `config.json` — set your organization(s):
    ```json
    {
-     "org": "your-org",
+     "orgs": ["your-org", "another-org"],
      "title": "PR Dashboard"
    }
    ```
