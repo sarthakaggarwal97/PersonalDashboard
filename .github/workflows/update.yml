@@ -3,6 +3,9 @@ name: Deploy PR Dashboard
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "config.json"
+      - "README.md"
   schedule:
     - cron: "0 16 * * *" # 9:00 AM PDT (UTC-7)
   workflow_dispatch:
@@ -48,7 +51,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "Update dashboard for ${OWNER}" && git push || true
+          if ! git diff --cached --quiet; then
+            git commit -m "Update dashboard for ${OWNER}"
+            git push
+          fi
 
       - name: Fetch PR data
         env:

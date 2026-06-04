@@ -133,7 +133,7 @@ body { background: var(--color-canvas-default); font-family: -apple-system, Blin
   <div class="header-row">
     <h1 id="dashboard-title">PR Dashboard</h1>
     <div class="header-actions">
-      <a href="https://github.com/roshkhatri/PersonalDashboard" target="_blank" rel="noopener" class="github-link" title="View on GitHub">
+      <a id="github-link" href="#" target="_blank" rel="noopener" class="github-link" title="View on GitHub">
         <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       </a>
       <button class="theme-toggle" id="theme-toggle" title="Toggle theme"></button>
@@ -488,12 +488,21 @@ function getSelectedRepos(containerId) {
   return new Set(Array.from(cbs).map(c => c.value));
 }
 
-Promise.all([fetch("config.json").then(r => r.json()), fetch("data/prs.json").then(r => r.json())])
+Promise.all([
+  fetch("config.json").then(r => { if (!r.ok) throw new Error("config.json not found"); return r.json(); }),
+  fetch("data/prs.json").then(r => {
+    if (!r.ok) return { github_user: "", orgs: [], updated: "", to_review: [], open_prs: [], closed_prs: [], reviewed_by: [], mentions: [], issues: [], counts: { to_review: 0, open: 0, closed: 0, reviewed_by: 0, mentions: 0, issues: 0 } };
+    return r.json();
+  })
+])
   .then(([config, data]) => {
     const orgs = config.orgs || (config.org ? [config.org] : []);
     const orgBadges = orgs.map(o => `<span class="org-badge">${escapeHtml(o)}</span>`).join(" ");
     document.getElementById("dashboard-title").innerHTML = `${escapeHtml(config.title)} ${orgBadges}`;
     document.title = `${config.title} - ${orgs.join(", ")}`;
+    if (config.github_user) {
+      document.getElementById("github-link").href = `https://github.com/${encodeURIComponent(config.github_user)}/PersonalDashboard`;
+    }
     const userLabel = data.github_user ? `@${data.github_user} • ` : "";
     const updatedLabel = data.updated ? `Updated ${data.updated}` : "Run the workflow to populate data";
     document.getElementById("subtitle").textContent = `${userLabel}${updatedLabel}`;

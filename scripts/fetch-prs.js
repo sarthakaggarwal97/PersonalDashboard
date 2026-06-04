@@ -57,17 +57,18 @@ async function searchAll(query) {
 function mapPR(item) {
   const repoFull = item.repository_url.split("/");
   const repo = repoFull[repoFull.length - 1];
+  const user = item.user || {};
   return {
     title: item.title,
     number: item.number,
     repo,
     url: item.html_url,
-    author: item.user.login,
-    avatar: item.user.avatar_url,
+    author: user.login || "ghost",
+    avatar: user.avatar_url || "",
     created: item.created_at.slice(0, 10),
     updated: item.updated_at.slice(0, 10),
     closed: item.closed_at ? item.closed_at.slice(0, 10) : "",
-    comments: item.comments,
+    comments: item.comments || 0,
     draft: item.draft || false,
     merged: item.pull_request?.merged_at != null,
   };
@@ -76,13 +77,14 @@ function mapPR(item) {
 function mapMention(item) {
   const repoFull = item.repository_url.split("/");
   const repo = repoFull[repoFull.length - 1];
+  const user = item.user || {};
   return {
     title: item.title,
     number: item.number,
     repo,
     url: item.html_url,
-    author: item.user.login,
-    avatar: item.user.avatar_url,
+    author: user.login || "ghost",
+    avatar: user.avatar_url || "",
     created: item.created_at.slice(0, 10),
     updated: item.updated_at.slice(0, 10),
     is_pr: !!item.pull_request,
@@ -130,6 +132,11 @@ async function fetchForOrg(org) {
 }
 
 async function main() {
+  if (ORGS.length === 0) {
+    console.error("No orgs configured. Set \"orgs\" in config.json (e.g. [\"my-org\"]).");
+    process.exit(1);
+  }
+
   console.log(`Fetching data for ${ORGS.length} org(s): ${ORGS.join(", ")}`);
 
   const results = await Promise.all(ORGS.map(fetchForOrg));
