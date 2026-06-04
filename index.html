@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PR Dashboard - valkey-io</title>
+<script>
+(function(){var s=localStorage.getItem("theme");var t=s==="light"||s==="dark"?s:window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";document.documentElement.setAttribute("data-theme",t)})();
+</script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --color-canvas-default: #ffffff;
+  --color-canvas-subtle: #f6f8fa;
+  --color-border-default: #d0d7de;
+  --color-border-muted: #d8dee4;
+  --color-fg-default: #1f2328;
+  --color-fg-muted: #656d76;
+  --color-fg-subtle: #6e7781;
+  --color-accent-fg: #0969da;
+  --color-accent-emphasis: #0969da;
+  --color-success-fg: #1a7f37;
+  --color-attention-fg: #9a6700;
+  --color-danger-fg: #d1242f;
+  --color-done-fg: #8250df;
+  --color-open-fg: #1a7f37;
+  --color-closed-fg: #cf222e;
+  --color-merged-fg: #8250df;
+  --color-neutral-muted: rgba(175,184,193,0.2);
+  --color-success-subtle: #dafbe1;
+  --color-attention-subtle: #fff8c5;
+  --color-danger-subtle: #ffebe9;
+  --color-done-subtle: #fbefff;
+  --color-accent-subtle: #ddf4ff;
+  --color-neutral-subtle: #eaeef2;
+}
+[data-theme="dark"] {
+  --color-canvas-default: #0d1117;
+  --color-canvas-subtle: #161b22;
+  --color-border-default: #30363d;
+  --color-border-muted: #21262d;
+  --color-fg-default: #e6edf3;
+  --color-fg-muted: #8d96a0;
+  --color-fg-subtle: #6e7681;
+  --color-accent-fg: #58a6ff;
+  --color-accent-emphasis: #1f6feb;
+  --color-success-fg: #3fb950;
+  --color-attention-fg: #d29922;
+  --color-danger-fg: #f85149;
+  --color-done-fg: #a371f7;
+  --color-open-fg: #3fb950;
+  --color-closed-fg: #f85149;
+  --color-merged-fg: #a371f7;
+  --color-neutral-muted: rgba(110,118,129,0.4);
+  --color-success-subtle: rgba(46,160,67,0.15);
+  --color-attention-subtle: rgba(187,128,9,0.15);
+  --color-danger-subtle: rgba(248,81,73,0.15);
+  --color-done-subtle: rgba(163,113,247,0.15);
+  --color-accent-subtle: rgba(56,139,253,0.15);
+  --color-neutral-subtle: rgba(110,118,129,0.1);
+}
+body { background: var(--color-canvas-default); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; color: var(--color-fg-default); padding: 24px; margin: 0; line-height: 1.5; }
+.header { margin-bottom: 24px; }
+.header h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.org-badge { background: var(--color-neutral-muted); border: 1px solid var(--color-border-default); border-radius: 2em; padding: 2px 10px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; color: var(--color-fg-muted); display: inline-block; margin-left: 8px; vertical-align: middle; }
+.subtitle { color: var(--color-fg-muted); font-size: 13px; margin-top: 4px; }
+.stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 24px; }
+@media (max-width: 900px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 400px) { .stats { grid-template-columns: 1fr; } }
+.stat-card { background: var(--color-canvas-subtle); border: 1px solid var(--color-border-default); border-radius: 6px; padding: 16px; cursor: pointer; transition: border-color 0.1s; }
+.stat-card:hover { border-color: var(--color-accent-emphasis); }
+.stat-card.active { border-color: var(--color-accent-emphasis); box-shadow: 0 0 0 1px var(--color-accent-emphasis); }
+.stat-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-fg-muted); margin-bottom: 4px; font-weight: 500; }
+.stat-value { font-size: 26px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; }
+.stat-card.review .stat-value { color: var(--color-attention-fg); }
+.stat-card.open .stat-value { color: var(--color-open-fg); }
+.stat-card.mentions .stat-value { color: var(--color-done-fg); }
+.stat-card.issues .stat-value { color: var(--color-accent-fg); }
+.stat-card.closed .stat-value { color: var(--color-merged-fg); }
+.stat-card.reviewed .stat-value { color: var(--color-success-fg); }
+.pr-list { display: flex; flex-direction: column; gap: 1px; background: var(--color-border-muted); border: 1px solid var(--color-border-default); border-radius: 6px; overflow: hidden; }
+.pr-item { background: var(--color-canvas-default); padding: 12px 16px; display: flex; align-items: flex-start; gap: 12px; transition: background 0.1s; }
+.pr-item:hover { background: var(--color-canvas-subtle); }
+.pr-avatar { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
+.pr-content { flex: 1; min-width: 0; }
+.pr-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.pr-title { font-size: 14px; font-weight: 600; color: var(--color-fg-default); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-title:hover { color: var(--color-accent-fg); }
+.pr-number { font-size: 12px; color: var(--color-fg-muted); font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; flex-shrink: 0; }
+.pr-meta { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--color-fg-muted); flex-wrap: wrap; }
+.pr-repo { background: var(--color-neutral-subtle); border-radius: 2em; padding: 1px 8px; font-size: 11px; font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; color: var(--color-fg-muted); }
+.pr-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 2em; font-size: 11px; font-weight: 500; }
+.badge-draft { background: var(--color-neutral-subtle); color: var(--color-fg-muted); }
+.badge-merged { background: var(--color-done-subtle); color: var(--color-merged-fg); }
+.badge-closed { background: var(--color-danger-subtle); color: var(--color-closed-fg); }
+.badge-stale { background: var(--color-danger-subtle); color: var(--color-danger-fg); }
+.badge-mention-pr { background: var(--color-accent-subtle); color: var(--color-accent-fg); }
+.badge-mention-issue { background: var(--color-done-subtle); color: var(--color-done-fg); }
+.badge-issue { background: var(--color-attention-subtle); color: var(--color-attention-fg); }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; margin-top: 8px; }
+.section-title { font-size: 14px; font-weight: 600; }
+.section-count { font-size: 12px; color: var(--color-fg-muted); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.loading { text-align: center; padding: 40px; color: var(--color-fg-muted); font-size: 14px; }
+.filters { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; padding: 12px 16px; background: var(--color-canvas-subtle); border: 1px solid var(--color-border-default); border-radius: 6px; flex-wrap: wrap; }
+.filter-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-fg-muted); font-weight: 500; }
+.filter-select, .filter-input { padding: 5px 8px; border: 1px solid var(--color-border-default); border-radius: 6px; font-size: 13px; font-family: inherit; color: var(--color-fg-default); background: var(--color-canvas-default); }
+.filter-select:focus, .filter-input:focus { outline: none; border-color: var(--color-accent-emphasis); box-shadow: 0 0 0 3px rgba(9,105,218,0.3); }
+.theme-toggle { background: var(--color-canvas-subtle); border: 1px solid var(--color-border-default); border-radius: 6px; padding: 4px 10px; font-size: 13px; cursor: pointer; color: var(--color-fg-muted); display: inline-flex; align-items: center; gap: 6px; }
+.theme-toggle:hover { background: var(--color-neutral-subtle); }
+.header-row { display: flex; align-items: center; justify-content: space-between; }
+.repo-filter { margin: 0; }
+.repo-filter summary { font-size: 13px; font-weight: 500; color: var(--color-fg-default); cursor: pointer; padding: 5px 8px; background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 6px; display: inline-block; list-style: none; }
+.repo-filter summary::-webkit-details-marker { display: none; }
+.repo-filter summary::after { content: " ▾"; color: var(--color-fg-muted); }
+.repo-filter[open] summary::after { content: " ▴"; }
+.repo-filter summary:hover { border-color: var(--color-accent-emphasis); }
+.repo-filter-body { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 0 4px; }
+.repo-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 2em; font-size: 12px; font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; color: var(--color-fg-muted); background: var(--color-canvas-default); border: 1px solid var(--color-border-default); cursor: pointer; user-select: none; }
+.repo-chip:hover { border-color: var(--color-accent-emphasis); }
+.repo-chip input { margin: 0; }
+.repo-chip.select-all { font-family: inherit; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-row">
+    <h1 id="dashboard-title">PR Dashboard</h1>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle theme"></button>
+  </div>
+  <div class="subtitle" id="subtitle">Loading...</div>
+</div>
+
+<div class="stats">
+  <div class="stat-card review active" data-tab="review">
+    <div class="stat-label">Needs Your Review</div>
+    <div class="stat-value" id="count-review">-</div>
+  </div>
+  <div class="stat-card open" data-tab="open">
+    <div class="stat-label">Working On</div>
+    <div class="stat-value" id="count-open">-</div>
+  </div>
+  <div class="stat-card mentions" data-tab="mentions">
+    <div class="stat-label">Mentions</div>
+    <div class="stat-value" id="count-mentions">-</div>
+  </div>
+  <div class="stat-card issues" data-tab="issues">
+    <div class="stat-label">Issues</div>
+    <div class="stat-value" id="count-issues">-</div>
+  </div>
+  <div class="stat-card reviewed" data-tab="reviewed">
+    <div class="stat-label">Reviewed</div>
+    <div class="stat-value" id="count-reviewed">-</div>
+  </div>
+  <div class="stat-card closed" data-tab="closed">
+    <div class="stat-label">Completed</div>
+    <div class="stat-value" id="count-closed">-</div>
+  </div>
+</div>
+
+<div id="tab-review" class="tab-content active">
+  <div class="section-header">
+    <span class="section-title">PRs Awaiting Your Review</span>
+    <span class="section-count" id="section-count-review"></span>
+  </div>
+  <div class="filters">
+    <details class="repo-filter">
+      <summary>Filter by repo</summary>
+      <div class="repo-filter-body" id="repo-checkboxes-review"></div>
+    </details>
+    <span class="filter-label">Sort</span>
+    <select class="filter-select" id="filter-review-sort">
+      <option value="updated">Recently updated</option>
+      <option value="created">Newest</option>
+      <option value="comments">Most comments</option>
+    </select>
+  </div>
+  <div class="pr-list" id="list-review"><div class="loading">Loading...</div></div>
+</div>
+
+<div id="tab-open" class="tab-content">
+  <div class="section-header">
+    <span class="section-title">Your Open PRs</span>
+    <span class="section-count" id="section-count-open"></span>
+  </div>
+  <div class="filters">
+    <details class="repo-filter">
+      <summary>Filter by repo</summary>
+      <div class="repo-filter-body" id="repo-checkboxes-open"></div>
+    </details>
+    <span class="filter-label">Sort</span>
+    <select class="filter-select" id="filter-open-sort">
+      <option value="updated">Recently updated</option>
+      <option value="created">Newest</option>
+      <option value="comments">Most comments</option>
+    </select>
+  </div>
+  <div class="pr-list" id="list-open"></div>
+</div>
+
+<div id="tab-mentions" class="tab-content">
+  <div class="section-header">
+    <span class="section-title">Mentions</span>
+    <span class="section-count" id="section-count-mentions"></span>
+  </div>
+  <div class="filters">
+    <details class="repo-filter">
+      <summary>Filter by repo</summary>
+      <div class="repo-filter-body" id="repo-checkboxes-mentions"></div>
+    </details>
+    <span class="filter-label">Type</span>
+    <select class="filter-select" id="filter-mentions-type">
+      <option value="">All</option>
+      <option value="pr">Pull Requests</option>
+      <option value="issue">Issues</option>
+    </select>
+  </div>
+  <div class="pr-list" id="list-mentions"></div>
+</div>
+
+<div id="tab-issues" class="tab-content">
+  <div class="section-header">
+    <span class="section-title">Your Issues</span>
+    <span class="section-count" id="section-count-issues"></span>
+  </div>
+  <div class="filters">
+    <details class="repo-filter">
+      <summary>Filter by repo</summary>
+      <div class="repo-filter-body" id="repo-checkboxes-issues"></div>
+    </details>
+  </div>
+  <div class="pr-list" id="list-issues"></div>
+</div>
+
+<div id="tab-reviewed" class="tab-content">
+  <div class="section-header">
+    <span class="section-title">PRs You Reviewed</span>
+    <span class="section-count" id="section-count-reviewed"></span>
+  </div>
+  <div class="filters">
+    <details class="repo-filter">
+      <summary>Filter by repo</summary>
+      <div class="repo-filter-body" id="repo-checkboxes-reviewed"></div>
+    </details>
+    <span class="filter-label">Status</span>
+    <select class="filter-select" id="filter-reviewed-status">
+      <option value="">All</option>
+      <option value="merged">Merged</option>
+      <option value="closed">Closed (not merged)</option>
+    </select>
+    <span class="filter-label">From</span>
+    <input type="date" class="filter-input" id="filter-reviewed-from">
+    <span class="filter-label">To</span>
+    <input type="date" class="filter-input" id="filter-reviewed-to">
+  </div>
+  <div class="pr-list" id="list-reviewed"></div>
+</div>
+
+<div id="tab-closed" class="tab-content">
+  <div class="section-header">
+    <span class="section-title">Completed PRs</span>
+    <span class="section-count" id="section-count-closed"></span>
+  </div>
+  <div class="filters">
+    <details class="repo-filter">
+      <summary>Filter by repo</summary>
+      <div class="repo-filter-body" id="repo-checkboxes-closed"></div>
+    </details>
+    <span class="filter-label">Status</span>
+    <select class="filter-select" id="filter-closed-status">
+      <option value="">All</option>
+      <option value="merged">Merged</option>
+      <option value="closed">Closed (not merged)</option>
+    </select>
+    <span class="filter-label">From</span>
+    <input type="date" class="filter-input" id="filter-closed-from">
+    <span class="filter-label">To</span>
+    <input type="date" class="filter-input" id="filter-closed-to">
+  </div>
+  <div class="pr-list" id="list-closed"></div>
+</div>
+
+<script>
+(function() {
+  const btn = document.getElementById("theme-toggle");
+  const systemDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+  function getEffective(pref) {
+    if (pref === "light" || pref === "dark") return pref;
+    return systemDark() ? "dark" : "light";
+  }
+
+  function apply() {
+    const pref = localStorage.getItem("theme") || "system";
+    document.documentElement.setAttribute("data-theme", getEffective(pref));
+    if (pref === "light") btn.textContent = "☀ Light";
+    else if (pref === "dark") btn.textContent = "☾ Dark";
+    else btn.textContent = "◐ System";
+  }
+  apply();
+
+  btn.addEventListener("click", () => {
+    const pref = localStorage.getItem("theme") || "system";
+    const next = pref === "system" ? "light" : pref === "light" ? "dark" : "system";
+    if (next === "system") localStorage.removeItem("theme");
+    else localStorage.setItem("theme", next);
+    apply();
+  });
+
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    apply();
+  });
+})();
+
+const cards = document.querySelectorAll(".stat-card");
+cards.forEach(card => {
+  card.addEventListener("click", () => {
+    const tab = card.dataset.tab;
+    cards.forEach(c => c.classList.remove("active"));
+    card.classList.add("active");
+    document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+    document.getElementById(`tab-${tab}`).classList.add("active");
+  });
+});
+
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  if (days === 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+function escapeHtml(str) {
+  const el = document.createElement("span");
+  el.textContent = str;
+  return el.innerHTML;
+}
+
+function daysOld(dateStr) {
+  if (!dateStr) return 0;
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+function renderPR(pr, type) {
+  let badge = "";
+  if (type === "closed") {
+    badge = pr.merged
+      ? `<span class="pr-badge badge-merged">✔ Merged</span>`
+      : `<span class="pr-badge badge-closed">✖ Closed</span>`;
+  } else if (pr.draft) {
+    badge = `<span class="pr-badge badge-draft">✏ Draft</span>`;
+  }
+  const staleBadge = (type === "review" && daysOld(pr.created) > 7)
+    ? `<span class="pr-badge badge-stale">${daysOld(pr.created)}d waiting</span>`
+    : "";
+  const dateLabel = type === "closed" ? `closed ${timeAgo(pr.closed)}` : `updated ${timeAgo(pr.updated)}`;
+  const authorLine = type === "review" ? `<span>@${escapeHtml(pr.author)}</span>` : "";
+
+  return `<div class="pr-item">
+    <img class="pr-avatar" src="${pr.avatar}" alt="" loading="lazy">
+    <div class="pr-content">
+      <div class="pr-title-row">
+        <a href="${pr.url}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(pr.title)}</a>
+        <span class="pr-number">#${pr.number}</span>
+        ${badge}${staleBadge}
+      </div>
+      <div class="pr-meta">
+        <span class="pr-repo">${escapeHtml(pr.repo)}</span>
+        ${authorLine}
+        <span>${dateLabel}</span>
+        ${pr.comments > 0 ? `<span>${pr.comments} comments</span>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderMention(item) {
+  const typeBadge = item.is_pr
+    ? `<span class="pr-badge badge-mention-pr">PR</span>`
+    : `<span class="pr-badge badge-mention-issue">Issue</span>`;
+  const staleBadge = daysOld(item.updated) > 7
+    ? `<span class="pr-badge badge-stale">${daysOld(item.updated)}d ago</span>`
+    : "";
+
+  return `<div class="pr-item">
+    <img class="pr-avatar" src="${item.avatar}" alt="" loading="lazy">
+    <div class="pr-content">
+      <div class="pr-title-row">
+        <a href="${item.url}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(item.title)}</a>
+        <span class="pr-number">#${item.number}</span>
+        ${typeBadge}${staleBadge}
+      </div>
+      <div class="pr-meta">
+        <span class="pr-repo">${escapeHtml(item.repo)}</span>
+        <span>@${escapeHtml(item.author)}</span>
+        <span>updated ${timeAgo(item.updated)}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderIssue(item) {
+  return `<div class="pr-item">
+    <img class="pr-avatar" src="${item.avatar}" alt="" loading="lazy">
+    <div class="pr-content">
+      <div class="pr-title-row">
+        <a href="${item.url}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(item.title)}</a>
+        <span class="pr-number">#${item.number}</span>
+        <span class="pr-badge badge-issue">Issue</span>
+      </div>
+      <div class="pr-meta">
+        <span class="pr-repo">${escapeHtml(item.repo)}</span>
+        <span>@${escapeHtml(item.author)}</span>
+        <span>updated ${timeAgo(item.updated)}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function sortPRs(prs, sortBy) {
+  return [...prs].sort((a, b) => {
+    if (sortBy === "comments") return b.comments - a.comments;
+    if (sortBy === "created") return b.created.localeCompare(a.created);
+    return b.updated.localeCompare(a.updated);
+  });
+}
+
+function buildRepoCheckboxes(containerId, items, onChange) {
+  const container = document.getElementById(containerId);
+  const repos = [...new Set(items.map(i => i.repo))].sort();
+
+  const selAll = document.createElement("label");
+  selAll.className = "repo-chip select-all";
+  const selCb = document.createElement("input");
+  selCb.type = "checkbox";
+  selCb.checked = true;
+  selCb.addEventListener("change", () => {
+    container.querySelectorAll("input").forEach(c => { c.checked = selCb.checked; });
+    onChange();
+  });
+  selAll.appendChild(selCb);
+  selAll.appendChild(document.createTextNode(" All"));
+  container.appendChild(selAll);
+
+  repos.forEach(repo => {
+    const label = document.createElement("label");
+    label.className = "repo-chip";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    cb.value = repo;
+    cb.addEventListener("change", onChange);
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(" " + repo));
+    container.appendChild(label);
+  });
+}
+
+function getSelectedRepos(containerId) {
+  const cbs = document.getElementById(containerId).querySelectorAll("input[value]:checked");
+  return new Set(Array.from(cbs).map(c => c.value));
+}
+
+Promise.all([fetch("config.json").then(r => r.json()), fetch("data/prs.json").then(r => r.json())])
+  .then(([config, data]) => {
+    document.getElementById("dashboard-title").innerHTML = `${escapeHtml(config.title)} <span class="org-badge">${escapeHtml(config.org)}</span>`;
+    document.title = `${config.title} - ${config.org}`;
+    document.getElementById("subtitle").textContent = `@${data.github_user} • Updated ${data.updated}`;
+    document.getElementById("count-review").textContent = data.counts.to_review;
+    document.getElementById("count-open").textContent = data.counts.open;
+    document.getElementById("count-mentions").textContent = data.counts.mentions || 0;
+    document.getElementById("count-issues").textContent = data.counts.issues || 0;
+    document.getElementById("count-reviewed").textContent = data.counts.reviewed_by || 0;
+    document.getElementById("count-closed").textContent = data.counts.closed;
+
+    const renderReview = () => {
+      const repos = getSelectedRepos("repo-checkboxes-review");
+      const sort = document.getElementById("filter-review-sort").value;
+      let filtered = data.to_review.filter(pr => repos.has(pr.repo));
+      filtered = sortPRs(filtered, sort);
+      document.getElementById("list-review").innerHTML = filtered.length
+        ? filtered.map(pr => renderPR(pr, "review")).join("")
+        : `<div class="loading">No PRs match the filter</div>`;
+      document.getElementById("section-count-review").textContent = `${filtered.length} open`;
+    };
+
+    const renderOpen = () => {
+      const repos = getSelectedRepos("repo-checkboxes-open");
+      const sort = document.getElementById("filter-open-sort").value;
+      let filtered = data.open_prs.filter(pr => repos.has(pr.repo));
+      filtered = sortPRs(filtered, sort);
+      document.getElementById("list-open").innerHTML = filtered.length
+        ? filtered.map(pr => renderPR(pr, "open")).join("")
+        : `<div class="loading">No PRs match the filter</div>`;
+      document.getElementById("section-count-open").textContent = `${filtered.length} open`;
+    };
+
+    const renderMentions = () => {
+      const repos = getSelectedRepos("repo-checkboxes-mentions");
+      const type = document.getElementById("filter-mentions-type").value;
+      let filtered = (data.mentions || []).filter(m => repos.has(m.repo));
+      if (type === "pr") filtered = filtered.filter(m => m.is_pr);
+      if (type === "issue") filtered = filtered.filter(m => !m.is_pr);
+      document.getElementById("list-mentions").innerHTML = filtered.length
+        ? filtered.map(renderMention).join("")
+        : `<div class="loading">No mentions match the filter</div>`;
+      document.getElementById("section-count-mentions").textContent = `${filtered.length} open`;
+    };
+
+    const renderIssues = () => {
+      const repos = getSelectedRepos("repo-checkboxes-issues");
+      let filtered = (data.issues || []).filter(i => repos.has(i.repo));
+      document.getElementById("list-issues").innerHTML = filtered.length
+        ? filtered.map(renderIssue).join("")
+        : `<div class="loading">No issues match the filter</div>`;
+      document.getElementById("section-count-issues").textContent = `${filtered.length} open`;
+    };
+
+    const renderReviewed = () => {
+      const repos = getSelectedRepos("repo-checkboxes-reviewed");
+      const status = document.getElementById("filter-reviewed-status").value;
+      const from = document.getElementById("filter-reviewed-from").value;
+      const to = document.getElementById("filter-reviewed-to").value;
+      let filtered = (data.reviewed_by || []).filter(pr => repos.has(pr.repo));
+      if (status === "merged") filtered = filtered.filter(pr => pr.merged);
+      if (status === "closed") filtered = filtered.filter(pr => !pr.merged);
+      if (from) filtered = filtered.filter(pr => pr.closed >= from);
+      if (to) filtered = filtered.filter(pr => pr.closed <= to);
+      document.getElementById("list-reviewed").innerHTML = filtered.length
+        ? filtered.map(pr => renderPR(pr, "closed")).join("")
+        : `<div class="loading">No PRs match the filter</div>`;
+      document.getElementById("section-count-reviewed").textContent = `${filtered.length} of ${(data.reviewed_by || []).length}`;
+    };
+
+    const renderClosed = () => {
+      const repos = getSelectedRepos("repo-checkboxes-closed");
+      const status = document.getElementById("filter-closed-status").value;
+      const from = document.getElementById("filter-closed-from").value;
+      const to = document.getElementById("filter-closed-to").value;
+      let filtered = data.closed_prs.filter(pr => repos.has(pr.repo));
+      if (status === "merged") filtered = filtered.filter(pr => pr.merged);
+      if (status === "closed") filtered = filtered.filter(pr => !pr.merged);
+      if (from) filtered = filtered.filter(pr => pr.closed >= from);
+      if (to) filtered = filtered.filter(pr => pr.closed <= to);
+      document.getElementById("list-closed").innerHTML = filtered.length
+        ? filtered.map(pr => renderPR(pr, "closed")).join("")
+        : `<div class="loading">No PRs match the filter</div>`;
+      document.getElementById("section-count-closed").textContent = `${filtered.length} of ${data.counts.closed}`;
+    };
+
+    buildRepoCheckboxes("repo-checkboxes-review", data.to_review, renderReview);
+    buildRepoCheckboxes("repo-checkboxes-open", data.open_prs, renderOpen);
+    buildRepoCheckboxes("repo-checkboxes-mentions", data.mentions || [], renderMentions);
+    buildRepoCheckboxes("repo-checkboxes-issues", data.issues || [], renderIssues);
+    buildRepoCheckboxes("repo-checkboxes-reviewed", data.reviewed_by || [], renderReviewed);
+    buildRepoCheckboxes("repo-checkboxes-closed", data.closed_prs, renderClosed);
+
+    document.getElementById("filter-review-sort").addEventListener("change", renderReview);
+    document.getElementById("filter-open-sort").addEventListener("change", renderOpen);
+    document.getElementById("filter-mentions-type").addEventListener("change", renderMentions);
+    document.getElementById("filter-reviewed-status").addEventListener("change", renderReviewed);
+    document.getElementById("filter-reviewed-from").addEventListener("change", renderReviewed);
+    document.getElementById("filter-reviewed-to").addEventListener("change", renderReviewed);
+    document.getElementById("filter-closed-status").addEventListener("change", renderClosed);
+    document.getElementById("filter-closed-from").addEventListener("change", renderClosed);
+    document.getElementById("filter-closed-to").addEventListener("change", renderClosed);
+
+    renderReview();
+    renderOpen();
+    renderMentions();
+    renderIssues();
+    renderReviewed();
+    renderClosed();
+  })
+  .catch(err => {
+    document.getElementById("list-review").innerHTML = `<div class="loading">Failed to load data: ${err.message}</div>`;
+  });
+</script>
+</body>
+</html>
