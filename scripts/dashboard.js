@@ -447,9 +447,38 @@ Promise.all([
     renderReviewed();
     renderClosed();
 
+    // Add expand/collapse all buttons to sections with activity
+    function addExpandAllButtons() {
+      document.querySelectorAll(".section-header").forEach(header => {
+        if (header.querySelector(".expand-all-btn")) return;
+        const list = header.parentElement.querySelector(".pr-list");
+        if (!list || !list.querySelector(".activity-section")) return;
+        const btn = document.createElement("button");
+        btn.className = "expand-all-btn activity-toggle";
+        btn.textContent = "▸ expand all";
+        btn.addEventListener("click", () => {
+          const sections = list.querySelectorAll(".activity-section");
+          const toggles = list.querySelectorAll(".activity-toggle[data-target]");
+          const anyOpen = list.querySelector(".activity-section.open");
+          sections.forEach(s => anyOpen ? s.classList.remove("open") : s.classList.add("open"));
+          toggles.forEach(t => t.textContent = anyOpen ? "▸ activity" : "▾ activity");
+          btn.textContent = anyOpen ? "▸ expand all" : "▾ collapse all";
+        });
+        header.querySelector(".section-count").before(btn);
+      });
+    }
+
+    // Run after initial render and re-run after re-renders
+    const origRenderReview = renderReview, origRenderOpen = renderOpen, origRenderReviewedOpen = renderReviewedOpen;
+    const withExpandBtn = (fn) => () => { fn(); addExpandAllButtons(); };
+    renderReview = withExpandBtn(origRenderReview);
+    renderOpen = withExpandBtn(origRenderOpen);
+    renderReviewedOpen = withExpandBtn(origRenderReviewedOpen);
+    renderReview(); renderOpen(); renderReviewedOpen();
+
     // Event delegation for activity toggles and mark-read buttons
     document.addEventListener("click", (e) => {
-      const toggle = e.target.closest(".activity-toggle");
+      const toggle = e.target.closest(".activity-toggle[data-target]");
       if (toggle) {
         e.stopPropagation();
         const section = document.getElementById(toggle.dataset.target);
@@ -463,7 +492,6 @@ Promise.all([
       if (markBtn) {
         e.stopPropagation();
         setReadMarker(markBtn.dataset.url);
-        // Re-render the containing list to update badges
         renderReview(); renderReviewedOpen(); renderOpen();
         return;
       }
