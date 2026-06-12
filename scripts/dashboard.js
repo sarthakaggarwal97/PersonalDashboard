@@ -306,7 +306,7 @@ Promise.all([
       refreshAll();
     });
 
-    const renderReview = () => {
+    let renderReview = () => {
       const overrides = getOverrides();
       const repos = getSelectedRepos("repo-checkboxes-review");
       const sort = document.getElementById("filter-review-sort").value;
@@ -323,7 +323,7 @@ Promise.all([
       });
     };
 
-    const renderReviewedOpen = () => {
+    let renderReviewedOpen = () => {
       const overrides = getOverrides();
       const repos = getSelectedRepos("repo-checkboxes-reviewed-open");
       const sort = document.getElementById("filter-reviewed-open-sort").value;
@@ -346,7 +346,7 @@ Promise.all([
       });
     };
 
-    const renderOpen = () => {
+    let renderOpen = () => {
       const repos = getSelectedRepos("repo-checkboxes-open");
       const sort = document.getElementById("filter-open-sort").value;
       let filtered = data.open_prs.filter(pr => repos.has(pr.repo));
@@ -439,9 +439,6 @@ Promise.all([
     document.getElementById("filter-closed-from").addEventListener("change", renderClosed);
     document.getElementById("filter-closed-to").addEventListener("change", renderClosed);
 
-    renderReview();
-    renderReviewedOpen();
-    renderOpen();
     renderMentions();
     renderIssues();
     renderReviewed();
