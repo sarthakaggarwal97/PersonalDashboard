@@ -176,8 +176,9 @@ function renderPR(pr, type, moveBtn) {
       <div class="pr-title-row">
         <a href="${escapeAttr(pr.url)}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(pr.title)}</a>
         <span class="pr-number">#${pr.number}</span>
-        ${ciDots}${badge}${staleBadge}${unreadBadge}
+        ${badge}${staleBadge}${unreadBadge}
         ${moveBtnHtml}
+        ${ciDots ? `<span class="ci-dots">${ciDots}</span>` : ""}
       </div>
       <div class="pr-meta">
         <span class="pr-repo">${escapeHtml(pr.repo)}</span>
