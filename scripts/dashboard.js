@@ -117,6 +117,7 @@ function renderPR(pr, type, moveBtn) {
   const hasActivity = pr.activity && pr.activity.length > 0 && type !== "closed";
   let unreadBadge = "";
   let activitySection = "";
+  let hasUnread = false;
 
   if (hasActivity) {
     const actId = `activity-${pr.repo}-${pr.number}`;
@@ -131,7 +132,8 @@ function renderPR(pr, type, moveBtn) {
 
     // Unread count uses read marker if available, else last_push
     const unread = getUnreadActivity(pr, DASHBOARD_USER).filter(a => a.type !== "commit");
-    unreadBadge = unread.length > 0
+    hasUnread = unread.length > 0;
+    unreadBadge = hasUnread
       ? `<span class="pr-badge badge-unread">${unread.length} new</span>`
       : "";
 
@@ -170,7 +172,9 @@ function renderPR(pr, type, moveBtn) {
     }).join("");
   }
 
-  return `<div class="pr-item">
+  const itemClass = (hasActivity && !hasUnread) ? "pr-item pr-quiet" : "pr-item";
+
+  return `<div class="${itemClass}">
     <img class="pr-avatar" src="${escapeAttr(pr.avatar)}" alt="" loading="lazy">
     <div class="pr-content">
       <div class="pr-title-row">
