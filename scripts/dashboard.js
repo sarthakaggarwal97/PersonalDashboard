@@ -160,12 +160,14 @@ function renderPR(pr, type, moveBtn) {
     ? `<button class="activity-toggle" data-target="activity-${pr.repo}-${pr.number}">▸ activity</button>`
     : "";
 
-  // CI status dot (only for unmerged PRs)
-  let ciDot = "";
-  if (pr.ci_status && type !== "closed") {
-    const ciClass = `ci-dot ci-${pr.ci_status}`;
-    const ciLink = pr.ci_url ? ` href="${escapeAttr(pr.ci_url)}" target="_blank" rel="noopener"` : "";
-    ciDot = `<a class="${ciClass}"${ciLink} title="${escapeAttr(pr.ci_summary)}"></a>`;
+  // CI status dots (one per job, only for unmerged PRs)
+  let ciDots = "";
+  if (pr.ci_jobs && pr.ci_jobs.length > 0 && type !== "closed") {
+    ciDots = pr.ci_jobs.map(job => {
+      const cls = `ci-dot ci-${job.status}`;
+      const link = job.url ? ` href="${escapeAttr(job.url)}" target="_blank" rel="noopener"` : "";
+      return `<a class="${cls}"${link} title="${escapeAttr(job.name)}"></a>`;
+    }).join("");
   }
 
   return `<div class="pr-item">
@@ -174,7 +176,7 @@ function renderPR(pr, type, moveBtn) {
       <div class="pr-title-row">
         <a href="${escapeAttr(pr.url)}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(pr.title)}</a>
         <span class="pr-number">#${pr.number}</span>
-        ${ciDot}${badge}${staleBadge}${unreadBadge}
+        ${ciDots}${badge}${staleBadge}${unreadBadge}
         ${moveBtnHtml}
       </div>
       <div class="pr-meta">

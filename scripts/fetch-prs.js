@@ -203,37 +203,27 @@ function mapReviewComment(item) {
 }
 
 async function fetchCIStatus(base, sha) {
-  if (!sha) return { ci_status: null, ci_summary: "" };
+  if (!sha) return { ci_jobs: [] };
   try {
     const { body } = await request(`${base}/commits/${sha}/check-runs?per_page=100`);
     const runs = body.check_runs || [];
-    if (runs.length === 0) return { ci_status: null, ci_summary: "" };
+    if (runs.length === 0) return { ci_jobs: [] };
 
-    let failed = 0, pending = 0, passed = 0, neutral = 0;
-    const failures = [];
+    const ci_jobs = [];
     for (const run of runs) {
-      if (run.status !== "completed") { pending++; continue; }
-      if (run.conclusion === "success") passed++;
-      else if (run.conclusion === "failure") { failed++; failures.push(run.name); }
-      else neutral++;
+      if (run.status !== "completed") {
+        ci_jobs.push({ name: run.name, status: "pending", url: run.html_url || "" });
+      } else if (run.conclusion === "success") {
+        ci_jobs.push({ name: run.name, status: "success", url: run.html_url || "" });
+      } else if (run.conclusion === "failure") {
+        ci_jobs.push({ name: run.name, status: "failure", url: run.html_url || "" });
+      }
+      // skip: skipped, neutral, cancelled
     }
-
-    let ci_status;
-    if (failed > 0) ci_status = "failure";
-    else if (pending > 0) ci_status = "pending";
-    else if (passed > 0) ci_status = "success";
-    else ci_status = "neutral";
-
-    const parts = [];
-    if (passed) parts.push(`${passed} passed`);
-    if (failed) parts.push(`${failed} failed: ${failures.slice(0, 3).join(", ")}`);
-    if (pending) parts.push(`${pending} pending`);
-    if (neutral) parts.push(`${neutral} skipped`);
-
-    return { ci_status, ci_summary: parts.join(", ") };
+    return { ci_jobs };
   } catch (e) {
     console.warn(`  Failed to fetch CI for ${sha.slice(0, 7)}: ${e.message}`);
-    return { ci_status: null, ci_summary: "" };
+    return { ci_jobs: [] };
   }
 }
 
@@ -286,12 +276,11 @@ async function enrichWithActivity(prs, label) {
   console.log(`\n  Fetching activity for ${prs.length} ${label} PRs...`);
   const enriched = [];
   for (const pr of prs) {
-    const { last_push, activity, ci_status, ci_summary } = await fetchActivity(pr);
-    const ci_url = ci_status ? `${pr.url}/checks` : "";
+    const { last_push, activity, ci_jobs } = await fetchActivity(pr);
     // Find the most recent activity event by the dashboard user (reviews, comments, review-comments)
     const myEvents = activity.filter(a => a.author === GITHUB_USER && a.type !== "commit");
     const my_last_interaction = myEvents.length > 0 ? myEvents[0].created_at : "";
-    enriched.push({ ...pr, last_push, activity, ci_status, ci_summary, ci_url, my_last_interaction });
+    enriched.push({ ...pr, last_push, activity, ci_jobs, my_last_interaction });
   }
   return enriched;
 }
