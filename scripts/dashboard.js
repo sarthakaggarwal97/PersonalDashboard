@@ -49,6 +49,7 @@ function escapeHtml(str) {
 }
 
 const OVERRIDES_KEY = "dashboard-overrides";
+let DASHBOARD_USER = "";
 function getOverrides() {
   try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY)) || {}; } catch { return {}; }
 }
@@ -68,10 +69,19 @@ function setReadMarker(url) {
   m[url] = new Date().toISOString();
   localStorage.setItem(READ_MARKERS_KEY, JSON.stringify(m));
 }
-function getUnreadActivity(pr) {
+function getUnreadActivity(pr, githubUser) {
   if (!pr.activity || pr.activity.length === 0) return [];
   const markers = getReadMarkers();
-  const since = markers[pr.url] || pr.last_push || pr.created;
+  let since;
+  if (markers[pr.url]) {
+    since = markers[pr.url];
+  } else if (githubUser && pr.author !== githubUser) {
+    // Others' PRs: anchor to my last interaction, or PR creation if never interacted
+    since = pr.my_last_interaction || pr.created;
+  } else {
+    // My PRs: anchor to last push
+    since = pr.last_push || pr.created;
+  }
   return filterUnreadActivity(pr.activity, since);
 }
 
@@ -120,7 +130,7 @@ function renderPR(pr, type, moveBtn) {
       .filter(a => a.type !== "commit" && a.created_at > since);
 
     // Unread count uses read marker if available, else last_push
-    const unread = getUnreadActivity(pr).filter(a => a.type !== "commit");
+    const unread = getUnreadActivity(pr, DASHBOARD_USER).filter(a => a.type !== "commit");
     unreadBadge = unread.length > 0
       ? `<span class="pr-badge badge-unread">${unread.length} new</span>`
       : "";
@@ -150,13 +160,21 @@ function renderPR(pr, type, moveBtn) {
     ? `<button class="activity-toggle" data-target="activity-${pr.repo}-${pr.number}">▸ activity</button>`
     : "";
 
+  // CI status dot (only for unmerged PRs)
+  let ciDot = "";
+  if (pr.ci_status && type !== "closed") {
+    const ciClass = `ci-dot ci-${pr.ci_status}`;
+    const ciLink = pr.ci_url ? ` href="${escapeAttr(pr.ci_url)}" target="_blank" rel="noopener"` : "";
+    ciDot = `<a class="${ciClass}"${ciLink} title="${escapeAttr(pr.ci_summary)}"></a>`;
+  }
+
   return `<div class="pr-item">
     <img class="pr-avatar" src="${escapeAttr(pr.avatar)}" alt="" loading="lazy">
     <div class="pr-content">
       <div class="pr-title-row">
         <a href="${escapeAttr(pr.url)}" target="_blank" rel="noopener" class="pr-title">${escapeHtml(pr.title)}</a>
         <span class="pr-number">#${pr.number}</span>
-        ${badge}${staleBadge}${unreadBadge}
+        ${ciDot}${badge}${staleBadge}${unreadBadge}
         ${moveBtnHtml}
       </div>
       <div class="pr-meta">
@@ -268,6 +286,7 @@ Promise.all([
     if (config.github_user) {
       document.getElementById("github-link").href = `https://github.com/${encodeURIComponent(config.github_user)}/PersonalDashboard`;
     }
+    DASHBOARD_USER = data.github_user || config.github_user || "";
     const userLabel = data.github_user ? `@${data.github_user} • ` : "";
     const updatedLabel = data.updated ? `Updated ${formatDate(data.updated)}` : "Run the workflow to populate data";
     document.getElementById("subtitle").textContent = `${userLabel}${updatedLabel}`;

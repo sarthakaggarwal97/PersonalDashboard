@@ -202,6 +202,41 @@ function mapReviewComment(item) {
   };
 }
 
+async function fetchCIStatus(base, sha) {
+  if (!sha) return { ci_status: null, ci_summary: "" };
+  try {
+    const { body } = await request(`${base}/commits/${sha}/check-runs?per_page=100`);
+    const runs = body.check_runs || [];
+    if (runs.length === 0) return { ci_status: null, ci_summary: "" };
+
+    let failed = 0, pending = 0, passed = 0, neutral = 0;
+    const failures = [];
+    for (const run of runs) {
+      if (run.status !== "completed") { pending++; continue; }
+      if (run.conclusion === "success") passed++;
+      else if (run.conclusion === "failure") { failed++; failures.push(run.name); }
+      else neutral++;
+    }
+
+    let ci_status;
+    if (failed > 0) ci_status = "failure";
+    else if (pending > 0) ci_status = "pending";
+    else if (passed > 0) ci_status = "success";
+    else ci_status = "neutral";
+
+    const parts = [];
+    if (passed) parts.push(`${passed} passed`);
+    if (failed) parts.push(`${failed} failed: ${failures.slice(0, 3).join(", ")}`);
+    if (pending) parts.push(`${pending} pending`);
+    if (neutral) parts.push(`${neutral} skipped`);
+
+    return { ci_status, ci_summary: parts.join(", ") };
+  } catch (e) {
+    console.warn(`  Failed to fetch CI for ${sha.slice(0, 7)}: ${e.message}`);
+    return { ci_status: null, ci_summary: "" };
+  }
+}
+
 async function fetchActivity(pr) {
   const [org, repo] = pr.url.replace("https://github.com/", "").split("/");
   const base = `https://api.github.com/repos/${org}/${repo}`;
@@ -232,6 +267,10 @@ async function fetchActivity(pr) {
     ? commits[commits.length - 1].commit?.committer?.date || commits[commits.length - 1].commit?.author?.date || ""
     : "";
 
+  // CI status from head commit
+  const headSha = commits.length > 0 ? commits[commits.length - 1].sha : "";
+  const ci = await fetchCIStatus(base, headSha);
+
   const activity = [
     ...commits.map(mapCommit),
     ...reviews.filter(r => r.state !== "PENDING" && r.body && r.body.trim()).map(mapReview),
@@ -239,7 +278,7 @@ async function fetchActivity(pr) {
     ...reviewComments.map(mapReviewComment),
   ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-  return { last_push, activity };
+  return { last_push, activity, ...ci };
 }
 
 async function enrichWithActivity(prs, label) {
@@ -247,8 +286,12 @@ async function enrichWithActivity(prs, label) {
   console.log(`\n  Fetching activity for ${prs.length} ${label} PRs...`);
   const enriched = [];
   for (const pr of prs) {
-    const { last_push, activity } = await fetchActivity(pr);
-    enriched.push({ ...pr, last_push, activity });
+    const { last_push, activity, ci_status, ci_summary } = await fetchActivity(pr);
+    const ci_url = ci_status ? `${pr.url}/checks` : "";
+    // Find the most recent activity event by the dashboard user (reviews, comments, review-comments)
+    const myEvents = activity.filter(a => a.author === GITHUB_USER && a.type !== "commit");
+    const my_last_interaction = myEvents.length > 0 ? myEvents[0].created_at : "";
+    enriched.push({ ...pr, last_push, activity, ci_status, ci_summary, ci_url, my_last_interaction });
   }
   return enriched;
 }
@@ -346,7 +389,7 @@ async function main() {
 
 // Allow importing for tests
 if (typeof module !== "undefined") {
-  module.exports = { mapPR, mapMention, mapComment, mapReview, mapCommit, mapReviewComment, fetchActivity, request, searchAll, sleep };
+  module.exports = { mapPR, mapMention, mapComment, mapReview, mapCommit, mapReviewComment, fetchActivity, fetchCIStatus, request, searchAll, sleep };
 }
 
 if (require.main === module) {
