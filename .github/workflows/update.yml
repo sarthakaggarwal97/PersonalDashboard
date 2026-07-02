@@ -7,7 +7,7 @@ on:
       - "config.json"
       - "README.md"
   schedule:
-    - cron: "0 16 * * *" # 9:00 AM PDT (UTC-7)
+    - cron: "0 * * * *" # Every hour
   workflow_dispatch:
 
 permissions:
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
@@ -70,7 +70,7 @@ jobs:
           path: .
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: build
     environment:
       name: github-pages
